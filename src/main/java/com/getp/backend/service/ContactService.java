@@ -24,16 +24,18 @@ public class ContactService {
         ContactMessage saved = contactRepository.save(contactMessage);
 
         // Send email after saving
-        try {
-        	emailService.sendContactNotification(
+        new Thread(() -> {
+            try {
+                emailService.sendContactNotification(
                     contactMessage.getName(),
                     contactMessage.getEmail(),
                     contactMessage.getSubject(),
                     contactMessage.getMessage()
-            ); 	
-        } catch (Exception e) {
-            System.out.println("Email failed but data saved: " + e.getMessage());
-        }
+                );
+            } catch (Exception e) {
+                System.out.println("Email failed: " + e.getMessage());
+            }
+        }).start();
 
         
 
