@@ -5,40 +5,27 @@ import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 
 import com.getp.backend.entity.ContactMessage;
-import com.getp.backend.repository.ContactRepository;
 
 @Service
 public class ContactService {
 
-    private final ContactRepository contactRepository;
-    private final EmailService emailService;
+    private final LeadStorageService leadStorageService;
 
-    public ContactService(ContactRepository contactRepository, EmailService emailService) {
-        this.contactRepository = contactRepository;
-        this.emailService = emailService;
+    public ContactService(LeadStorageService leadStorageService) {
+        this.leadStorageService = leadStorageService;
     }
 
-    public ContactMessage saveContact(ContactMessage contactMessage) {
-        contactMessage.setCreatedAt(java.time.LocalDateTime.now());
+    public void saveContact(ContactMessage contactMessage) {
 
-        ContactMessage saved = contactRepository.save(contactMessage);
+        contactMessage.setCreatedAt(LocalDateTime.now());
 
-        // Send email after saving
+        // async fire and forget
         new Thread(() -> {
             try {
-                emailService.sendContactNotification(
-                    contactMessage.getName(),
-                    contactMessage.getEmail(),
-                    contactMessage.getSubject(),
-                    contactMessage.getMessage()
-                );
+                leadStorageService.saveLead(contactMessage);
             } catch (Exception e) {
-                System.out.println("Email failed: " + e.getMessage());
+                System.out.println("Lead save failed: " + e.getMessage());
             }
         }).start();
-
-        
-
-        return saved;
     }
 }
