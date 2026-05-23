@@ -1,42 +1,47 @@
 package com.getp.backend.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import com.getp.backend.entity.ContactMessage;
+
+import java.util.Map;
 
 @Service
 public class EmailNotificationService {
 
-    private final JavaMailSender mailSender;
+	@Value("${resend.api.key}")
+	private String resendApiKey;
 
-    @Value("${notification.email.from}")
-    private String fromEmail;
+	@Value("${notification.email.to}")
+	private String toEmail;
 
-    @Value("${notification.email.to}")
-    private String toEmail;
+	public void sendNotification(ContactMessage msg) {
+		RestTemplate restTemplate = new RestTemplate();
 
-    public EmailNotificationService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setBearerAuth(resendApiKey);
 
-    public void sendNotification(ContactMessage msg) {
-        SimpleMailMessage email = new SimpleMailMessage();
-        email.setFrom(fromEmail);
-        email.setTo(toEmail);
-        email.setSubject("New Lead: " + (msg.getSubject() != null ? msg.getSubject() : "Contact Form Submission"));
-        email.setText(
-            "New contact form submission:\n\n" +
-            "Name:    " + msg.getName() + "\n" +
-            "Email:   " + msg.getEmail() + "\n" +
-            "Phone:   " + msg.getPhone() + "\n" +
-            "Subject: " + msg.getSubject() + "\n\n" +
-            "Message:\n" + msg.getMessage() + "\n\n" +
-            "Submitted at: " + msg.getCreatedAt()
-        );
-        mailSender.send(email);
-        System.out.println("Notification sent for: " + msg.getEmail());
-    }
+		String body = String.format(
+				"""
+						{
+						    "from": "GETP Leads <onboarding@resend.dev>",
+						    "to": ["%s"],
+						    "subject": "New Lead: %s",
+						    "text": "New contact form submission:\\n\\nName: %s\\nEmail: %s\\nPhone: %s\\nSubject: %s\\n\\nMessage:\\n%s\\n\\nSubmitted at: %s"
+						}
+						""",
+				toEmail, msg.getSubject() != null ? msg.getSubject() : "Contact Form Submission", msg.getName(),
+				msg.getEmail(), msg.getPhone(), msg.getSubject(), msg.getMessage(), msg.getCreatedAt());
+
+		HttpEntity<String> request = new HttpEntity<>(body, headers);
+
+		ResponseEntity<String> response = restTemplate.postForEntity("https://api.resend.com/emails", request,
+				String.class);
+
+		System.out.println("Resend response: " + response.getStatusCode());
+	}
 }
